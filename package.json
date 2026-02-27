@@ -6,7 +6,7 @@
 		"dev": "next dev",
 		"build": "next build",
 		"start": "next start",
-		"lint": "bunx --bun @biomejs/biome check --write"
+		"lint": "npx @biomejs/biome check --write"
 	},
 	"dependencies": {
 		"@better-auth/prisma-adapter": "^1.5.0-beta.9",

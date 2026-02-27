@@ -1,6 +1,14 @@
 "use client";
 
-import { Check, CheckCircle2, Copy, Gamepad2 } from "lucide-react";
+import {
+	Check,
+	CheckCircle2,
+	Copy,
+	ExternalLink,
+	Gamepad2,
+	Loader2,
+	Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +20,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { connectPSN, connectSteam } from "./actions";
+import { connectPSN, connectSteam, disconnectConnection } from "./actions";
 
 interface ConnectionsClientProps {
 	initialConnections: { type: string; value: string }[];
@@ -23,6 +31,8 @@ export function ConnectionsClient({
 }: ConnectionsClientProps) {
 	const [isSteamConnecting, setIsSteamConnecting] = useState(false);
 	const [isPsnConnecting, setIsPsnConnecting] = useState(false);
+	const [isSteamUnlinking, setIsSteamUnlinking] = useState(false);
+	const [isPsnUnlinking, setIsPsnUnlinking] = useState(false);
 	const [copiedId, setCopiedId] = useState<string | null>(null);
 
 	const steamConnection = initialConnections.find((c) => c.type === "STEAM");
@@ -60,6 +70,20 @@ export function ConnectionsClient({
 		}
 	};
 
+	const handleUnlink = async (type: "STEAM" | "PSN") => {
+		if (type === "STEAM") setIsSteamUnlinking(true);
+		else setIsPsnUnlinking(true);
+
+		try {
+			await disconnectConnection(type);
+		} catch (error) {
+			console.error(`Failed to unlink ${type}:`, error);
+		} finally {
+			if (type === "STEAM") setIsSteamUnlinking(false);
+			else setIsPsnUnlinking(false);
+		}
+	};
+
 	return (
 		<div className="grid gap-6 md:grid-cols-2">
 			<Card>
@@ -88,20 +112,35 @@ export function ConnectionsClient({
 									<span className="text-sm font-mono text-muted-foreground break-all">
 										{steamConnection.value}
 									</span>
-									<Button
-										variant="ghost"
-										size="icon"
-										className="h-8 w-8 shrink-0"
-										onClick={() =>
-											copyToClipboard(steamConnection.value, "steam")
-										}
-									>
-										{copiedId === "steam" ? (
-											<Check className="h-4 w-4 text-green-600" />
-										) : (
-											<Copy className="h-4 w-4" />
-										)}
-									</Button>
+									<div className="flex items-center gap-1 shrink-0">
+										<Button
+											variant="ghost"
+											size="icon"
+											className="h-8 w-8"
+											onClick={() =>
+												copyToClipboard(steamConnection.value, "steam")
+											}
+										>
+											{copiedId === "steam" ? (
+												<Check className="h-4 w-4 text-green-600" />
+											) : (
+												<Copy className="h-4 w-4" />
+											)}
+										</Button>
+										<Button
+											variant="ghost"
+											size="icon"
+											className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+											onClick={() => handleUnlink("STEAM")}
+											disabled={isSteamUnlinking}
+										>
+											{isSteamUnlinking ? (
+												<Loader2 className="h-4 w-4 animate-spin" />
+											) : (
+												<Trash2 className="h-4 w-4" />
+											)}
+										</Button>
+									</div>
 								</div>
 							</div>
 							<p className="text-xs text-muted-foreground text-center">
@@ -111,7 +150,17 @@ export function ConnectionsClient({
 					) : (
 						<form onSubmit={handleSteamSubmit} className="space-y-4">
 							<div className="space-y-2">
-								<Label htmlFor="steamId">Steam ID</Label>
+								<div className="flex items-center justify-between">
+									<Label htmlFor="steamId">Steam ID</Label>
+									<a
+										href="https://help.steampowered.com/en/faqs/view/2816-BE67-5B69-0FEC"
+										target="_blank"
+										rel="noopener noreferrer"
+										className="text-[10px] text-muted-foreground hover:text-primary underline underline-offset-2 flex items-center gap-1"
+									>
+										How to find? <ExternalLink className="h-2 w-2" />
+									</a>
+								</div>
 								<Input
 									id="steamId"
 									name="steamId"
@@ -119,6 +168,18 @@ export function ConnectionsClient({
 									required
 									disabled={isSteamConnecting}
 								/>
+								<p className="text-[10px] text-muted-foreground">
+									You can also use{" "}
+									<a
+										href="https://www.steamidfinder.com/"
+										target="_blank"
+										rel="noopener noreferrer"
+										className="underline hover:text-primary"
+									>
+										Steam ID Finder
+									</a>{" "}
+									to get your SteamID64.
+								</p>
 							</div>
 							<Button
 								type="submit"
@@ -158,18 +219,35 @@ export function ConnectionsClient({
 									<span className="text-sm font-mono text-muted-foreground break-all">
 										{psnConnection.value}
 									</span>
-									<Button
-										variant="ghost"
-										size="icon"
-										className="h-8 w-8 shrink-0"
-										onClick={() => copyToClipboard(psnConnection.value, "psn")}
-									>
-										{copiedId === "psn" ? (
-											<Check className="h-4 w-4 text-green-600" />
-										) : (
-											<Copy className="h-4 w-4" />
-										)}
-									</Button>
+									<div className="flex items-center gap-1 shrink-0">
+										<Button
+											variant="ghost"
+											size="icon"
+											className="h-8 w-8"
+											onClick={() =>
+												copyToClipboard(psnConnection.value, "psn")
+											}
+										>
+											{copiedId === "psn" ? (
+												<Check className="h-4 w-4 text-green-600" />
+											) : (
+												<Copy className="h-4 w-4" />
+											)}
+										</Button>
+										<Button
+											variant="ghost"
+											size="icon"
+											className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+											onClick={() => handleUnlink("PSN")}
+											disabled={isPsnUnlinking}
+										>
+											{isPsnUnlinking ? (
+												<Loader2 className="h-4 w-4 animate-spin" />
+											) : (
+												<Trash2 className="h-4 w-4" />
+											)}
+										</Button>
+									</div>
 								</div>
 							</div>
 							<p className="text-xs text-muted-foreground text-center">
@@ -179,7 +257,17 @@ export function ConnectionsClient({
 					) : (
 						<form onSubmit={handlePsnSubmit} className="space-y-4">
 							<div className="space-y-2">
-								<Label htmlFor="psnToken">PSN Cookie Token</Label>
+								<div className="flex items-center justify-between">
+									<Label htmlFor="psnToken">PSN Cookie Token</Label>
+									<a
+										href="https://github.com/mizne/psn-nps?tab=readme-ov-file#obtaining-a-psn-cookie-token"
+										target="_blank"
+										rel="noopener noreferrer"
+										className="text-[10px] text-muted-foreground hover:text-primary underline underline-offset-2 flex items-center gap-1"
+									>
+										How to find? <ExternalLink className="h-2 w-2" />
+									</a>
+								</div>
 								<Input
 									id="psnToken"
 									name="psnToken"

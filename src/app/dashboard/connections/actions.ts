@@ -144,3 +144,74 @@ export async function getConnections() {
 		value: decrypt(c.value),
 	}));
 }
+
+export async function getSteamPlayerSummary(steamId: string) {
+	const API_KEY = process.env.STEAM_API_KEY;
+	if (!API_KEY || API_KEY === "YOUR_STEAM_API_KEY_HERE") {
+		return null;
+	}
+
+	// Basic check: SteamIDs represent 64-bit integers and are usually 17 digits long.
+	if (!/^\d+$/.test(steamId)) {
+		console.warn(
+			`[Steam] Skipping fetch: ID is not numeric. Re-connection required.`,
+		);
+		return null;
+	}
+
+	try {
+		const url = `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${API_KEY}&steamids=${steamId}`;
+		const response = await fetch(url, { cache: "no-store" });
+
+		if (!response.ok) {
+			return null;
+		}
+
+		const data = await response.json();
+		return data.response.players?.[0] || null;
+	} catch (error) {
+		console.error("[Steam] Fetch Exception:", error);
+		return null;
+	}
+}
+
+export async function getSteamLevel(steamId: string) {
+	const API_KEY = process.env.STEAM_API_KEY;
+	if (!API_KEY || API_KEY === "YOUR_STEAM_API_KEY_HERE") {
+		return null;
+	}
+
+	try {
+		const response = await fetch(
+			`https://api.steampowered.com/IPlayerService/GetSteamLevel/v1/?key=${API_KEY}&steamid=${steamId}`,
+		);
+		const data = await response.json();
+		return data.response.player_level || null;
+	} catch (error) {
+		console.error("Failed to fetch Steam level:", error);
+		return null;
+	}
+}
+
+export async function disconnectConnection(type: "STEAM" | "PSN") {
+	const session = await auth.api.getSession({
+		headers: await headers(),
+	});
+
+	if (!session?.user) {
+		throw new Error("Unauthorized");
+	}
+
+	await prisma.connection.delete({
+		where: {
+			userId_type: {
+				userId: session.user.id,
+				type,
+			},
+		},
+	});
+
+	revalidatePath("/dashboard/connections");
+	revalidatePath("/dashboard");
+	return { success: true };
+}
