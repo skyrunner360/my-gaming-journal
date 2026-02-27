@@ -13,5 +13,19 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql
 
+  studio:
+    image: oven/bun:latest
+    container_name: gaming-journal-studio
+    working_dir: /app
+    volumes:
+      - .:/app
+    environment:
+      DATABASE_URL: postgresql://user:password@db:5432/gaming_journal
+    ports:
+      - "5555:51212"
+    command: bunx prisma studio --browser none
+    depends_on:
+      - db
+
 volumes:
   pgdata:
