@@ -1,0 +1,17 @@
+services:
+  db:
+    build:
+      context: .
+      dockerfile: Dockerfile.db
+    container_name: gaming-journal-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: gaming_journal
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+
+volumes:
+  pgdata:

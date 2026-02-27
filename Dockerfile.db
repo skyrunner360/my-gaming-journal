@@ -1,0 +1,6 @@
+FROM postgres:latest
+
+# You can add custom initialization scripts here if needed
+# COPY ./init.sql /docker-entrypoint-initdb.d/
+
+EXPOSE 5432
