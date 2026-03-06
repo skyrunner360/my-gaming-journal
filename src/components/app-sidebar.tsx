@@ -39,14 +39,14 @@ const navItems = [
 		icon: Home,
 	},
 	{
-		title: "Connections",
-		url: "/dashboard/connections",
-		icon: Users,
-	},
-	{
 		title: "Journal",
 		url: "/dashboard/journal",
 		icon: BookOpen,
+	},
+	{
+		title: "Connections",
+		url: "/dashboard/connections",
+		icon: Users,
 	},
 	{
 		title: "Account",

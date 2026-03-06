@@ -1,0 +1,13 @@
+model JournalEntry {
+    id        String   @id @default(cuid())
+    userId    String
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    content   String
+    gameId    Int? // Steam AppID or similar
+    gameName  String?
+    gameIcon  String?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("journal_entry")
+}

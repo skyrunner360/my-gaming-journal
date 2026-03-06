@@ -1,14 +1,18 @@
 model User {
-    id            String       @id @default(cuid())
-    name          String?
-    email         String       @unique
-    emailVerified Boolean      @default(false)
-    image         String?
-    createdAt     DateTime     @default(now())
-    updatedAt     DateTime     @updatedAt
-    sessions      Session[]
-    accounts      Account[]
-    connections   Connection[]
+    id              String          @id @default(cuid())
+    name            String?
+    email           String          @unique
+    emailVerified   Boolean         @default(false)
+    image           String?
+    createdAt       DateTime        @default(now())
+    updatedAt       DateTime        @updatedAt
+    sessions        Session[]
+    accounts        Account[]
+    connections     Connection[]
+    journalEntries  JournalEntry[]
+    backlogEntries  BacklogEntry[]
+    wishlists       Wishlist[]
+    wishlistEntries WishlistEntry[]
 
     @@map("user")
 }

@@ -1,171 +1,326 @@
-"use client"
-import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ExternalLink, Gamepad2, Search } from "lucide-react";
+"use client";
+
+import { useCallback, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Input } from "@/components/ui/input";
+import { BacklogTab } from "./_components/backlog-tab";
+import { GameJournalListModal } from "./_components/game-journal-list-modal";
+import { JournalFAB } from "./_components/journal-fab";
+import { JournalModal } from "./_components/journal-modal";
+import { LibraryTab } from "./_components/library-tab";
+import { RawJournalTab } from "./_components/raw-journal-tab";
+import { WishlistModal } from "./_components/wishlist-modal";
+import { WishlistTab } from "./_components/wishlist-tab";
+import {
+    createBacklogEntry,
+    createJournalEntry,
+    createWishlist,
+    deleteBacklogEntry,
+    deleteJournalEntry,
+    deleteWishlist,
+    searchGames,
+    updateBacklogPositions,
+    updateJournalEntry,
+} from "./actions";
 
 interface Game {
     appid: number;
     name: string;
     playtime_forever: number;
     img_icon_url: string;
-    has_community_visible_stats?: boolean;
+    is_family_shared?: boolean;
 }
 
-interface PSNGame {
-    name: string;
-    // Add more fields if needed
+interface JournalEntry {
+    id: string;
+    content: string;
+    gameId?: number | null;
+    gameName?: string | null;
+    gameIcon?: string | null;
+    createdAt: string;
+}
+
+interface BacklogItem {
+    id: string;
+    gameId: number;
+    gameName: string;
+    gameIcon: string | null;
+    position: number;
+}
+
+interface WishlistEntry {
+    id: string;
+    gambrainId: number;
+    gameName: string;
+    gameImage: string | null;
+    storeUrl: string | null;
+}
+
+interface Wishlist {
+    id: string;
+    title: string;
+    createdAt: string;
+    items: WishlistEntry[];
 }
 
 interface JournalClientProps {
     steamGames: Game[];
-    psnGames: PSNGame[];
+    initialEntries: JournalEntry[];
+    initialBacklog: BacklogItem[];
+    initialWishlists: Wishlist[];
 }
 
-export function JournalClient({ steamGames, psnGames }: JournalClientProps) {
-    const [searchQuery, setSearchQuery] = useState("");
-    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+export function JournalClient({
+    steamGames,
+    initialEntries,
+    initialBacklog,
+    initialWishlists,
+}: JournalClientProps) {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isListModalOpen, setIsListModalOpen] = useState(false);
+    const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
+    const [selectedGameForJournals, setSelectedGameForJournals] =
+        useState<Game | null>(null);
+    const [entries, setEntries] = useState<JournalEntry[]>(initialEntries);
+    const [backlog, setBacklog] = useState<BacklogItem[]>(initialBacklog);
 
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedSearchQuery(searchQuery);
-        }, 300);
+    // ─── Journal Handlers ─────────────────────────────────
 
-        return () => clearTimeout(timer);
-    }, [searchQuery]);
+    const handleSaveEntry = async (data: {
+        content: string;
+        gameId?: number;
+        gameName?: string;
+        gameIcon?: string;
+    }) => {
+        if (editingEntry) {
+            const updatedEntry = await updateJournalEntry(editingEntry.id, data);
+            const serializedEntry = {
+                id: updatedEntry.id,
+                content: updatedEntry.content,
+                gameId: updatedEntry.gameId,
+                gameName: updatedEntry.gameName,
+                gameIcon: updatedEntry.gameIcon,
+                createdAt: updatedEntry.createdAt.toISOString(),
+            };
+            setEntries(
+                entries.map((e) =>
+                    e.id === editingEntry.id ? serializedEntry : e,
+                ),
+            );
+        } else {
+            const newEntry = await createJournalEntry(data);
+            const serializedEntry = {
+                id: newEntry.id,
+                content: newEntry.content,
+                gameId: newEntry.gameId,
+                gameName: newEntry.gameName,
+                gameIcon: newEntry.gameIcon,
+                createdAt: newEntry.createdAt.toISOString(),
+            };
+            setEntries([serializedEntry, ...entries]);
+        }
+    };
 
-    const filteredSteamGames = steamGames.filter((game) =>
-        game.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
-    );
+    const handleDeleteEntry = async (id: string) => {
+        await deleteJournalEntry(id);
+        setEntries(entries.filter((e) => e.id !== id));
+    };
+
+    const handleEditEntry = (entry: { id: string; content: string; gameId?: number | null; gameName?: string | null; gameIcon?: string | null; createdAt: string | Date }) => {
+        const entryToEdit: JournalEntry = {
+            id: entry.id,
+            content: entry.content,
+            gameId: entry.gameId,
+            gameName: entry.gameName,
+            gameIcon: entry.gameIcon,
+            createdAt:
+                typeof entry.createdAt === "string"
+                    ? entry.createdAt
+                    : entry.createdAt.toISOString(),
+        };
+        setEditingEntry(entryToEdit);
+        setIsModalOpen(true);
+    };
+
+    const handleAddNew = () => {
+        setEditingEntry(null);
+        setIsModalOpen(true);
+    };
+
+    const handleGameSelect = (game: Game) => {
+        setSelectedGameForJournals(game);
+        setIsListModalOpen(true);
+    };
+
+    const filteredEntriesForGame = selectedGameForJournals
+        ? entries.filter((e) => e.gameId === selectedGameForJournals.appid)
+        : [];
+
+    // ─── Backlog Handlers ─────────────────────────────────
+
+    const handleAddToBacklog = async (game: Game) => {
+        const newEntry = await createBacklogEntry({
+            gameId: game.appid,
+            gameName: game.name,
+            gameIcon: game.img_icon_url,
+        });
+        setBacklog([
+            ...backlog,
+            {
+                id: newEntry.id,
+                gameId: newEntry.gameId,
+                gameName: newEntry.gameName,
+                gameIcon: newEntry.gameIcon,
+                position: newEntry.position,
+            },
+        ]);
+    };
+
+    const handleRemoveFromBacklog = async (id: string) => {
+        await deleteBacklogEntry(id);
+        setBacklog(backlog.filter((b) => b.id !== id));
+    };
+
+    const handleReorderBacklog = async (
+        items: { id: string; position: number }[],
+    ) => {
+        await updateBacklogPositions(items);
+    };
+
+    // ─── Wishlist Handlers ─────────────────────────────────
+
+    const [wishlists, setWishlists] = useState<Wishlist[]>(initialWishlists);
+    const [isWishlistModalOpen, setIsWishlistModalOpen] = useState(false);
+
+    const handleSearchGames = useCallback(async (query: string) => {
+        return await searchGames(query);
+    }, []);
+
+    const handleCreateWishlist = async (
+        title: string,
+        items: {
+            gambrainId: number;
+            gameName: string;
+            gameImage?: string;
+            storeUrl?: string;
+        }[],
+    ) => {
+        const newList = await createWishlist(title, items);
+        setWishlists([
+            {
+                id: newList.id,
+                title: newList.title,
+                createdAt: newList.createdAt.toISOString(),
+                items: newList.items.map((i) => ({
+                    id: i.id,
+                    gambrainId: i.gambrainId,
+                    gameName: i.gameName,
+                    gameImage: i.gameImage,
+                    storeUrl: i.storeUrl,
+                })),
+            },
+            ...wishlists,
+        ]);
+        setIsWishlistModalOpen(false);
+    };
+
+    const handleDeleteWishlist = async (id: string, title: string) => {
+        await deleteWishlist(id);
+        setWishlists(wishlists.filter((w) => w.id !== id));
+    };
 
     return (
-        <Tabs defaultValue="raw" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="raw">Raw Journals</TabsTrigger>
-                <TabsTrigger value="backlogs">Backlogs</TabsTrigger>
-                <TabsTrigger value="wishlist">Wishlist</TabsTrigger>
-                <TabsTrigger value="library">Library</TabsTrigger>
-            </TabsList>
+        <div className="relative">
+            <Tabs defaultValue="raw" className="space-y-6">
+                <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="raw">Raw Journals</TabsTrigger>
+                    <TabsTrigger value="backlogs">Backlogs</TabsTrigger>
+                    <TabsTrigger value="wishlist">Wishlist</TabsTrigger>
+                    <TabsTrigger value="library">Library</TabsTrigger>
+                </TabsList>
 
-            <TabsContent value="raw" className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    <Card>
-                        <CardContent className="pt-6">
-                            <p className="text-sm font-medium">Empty Journal</p>
-                            <p className="text-xs text-muted-foreground">
-                                Start your first entry to see it here.
-                            </p>
-                        </CardContent>
-                    </Card>
-                </div>
-            </TabsContent>
+                <TabsContent value="raw">
+                    <RawJournalTab
+                        entries={entries.map((e) => ({
+                            ...e,
+                            createdAt: new Date(e.createdAt),
+                        }))}
+                        onAddNew={handleAddNew}
+                        onEdit={handleEditEntry}
+                        onDelete={handleDeleteEntry}
+                    />
+                </TabsContent>
 
-            <TabsContent value="backlogs">
-                <Card>
-                    <CardContent className="pt-6">
-                        <p className="text-sm text-muted-foreground">No backlogs yet.</p>
-                    </CardContent>
-                </Card>
-            </TabsContent>
+                <TabsContent value="backlogs">
+                    <BacklogTab
+                        steamGames={steamGames}
+                        backlogItems={backlog}
+                        onAddToBacklog={handleAddToBacklog}
+                        onRemoveFromBacklog={handleRemoveFromBacklog}
+                        onReorder={handleReorderBacklog}
+                    />
+                </TabsContent>
 
-            <TabsContent value="wishlist">
-                <Card>
-                    <CardContent className="pt-6">
-                        <p className="text-sm text-muted-foreground">Your wishlist is empty.</p>
-                    </CardContent>
-                </Card>
-            </TabsContent>
+                <TabsContent value="wishlist">
+                    <WishlistTab
+                        lists={wishlists}
+                        onAddNew={() => setIsWishlistModalOpen(true)}
+                        onDelete={handleDeleteWishlist}
+                    />
+                </TabsContent>
 
-            <TabsContent value="library" className="space-y-6 h-[calc(100vh-280px)] min-h-[500px]">
-                <div className="flex items-center justify-between gap-4 py-2">
-                    <div className="relative flex-1 max-w-sm">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Search your library..."
-                            className="pl-9 h-9"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
-                    <div className="flex items-center gap-1.5 px-3 py-1 bg-muted/50 rounded-md border text-xs font-medium">
-                        <Gamepad2 className="h-4 w-4 text-primary" />
-                        <span>{filteredSteamGames.length} Games</span>
-                    </div>
-                </div>
+                <TabsContent value="library">
+                    <LibraryTab
+                        steamGames={steamGames}
+                        entries={entries}
+                        onGameSelect={handleGameSelect}
+                    />
+                </TabsContent>
+            </Tabs>
 
-                <div className="flex flex-col md:flex-row gap-8 h-[calc(100%-60px)] overflow-hidden">
-                    {/* Steam Section */}
-                    <div className="flex-1 flex flex-col min-w-0">
-                        <div className="flex items-center gap-2 border-b pb-2 mb-4 shrink-0">
-                            <Gamepad2 className="h-5 w-5 text-[#003087]" />
-                            <h3 className="font-semibold text-lg">Steam Library</h3>
-                        </div>
+            <JournalModal
+                isOpen={isModalOpen}
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setEditingEntry(null);
+                }}
+                onSave={handleSaveEntry}
+                games={steamGames}
+                initialData={
+                    editingEntry
+                        ? {
+                            content: editingEntry.content,
+                            gameId: editingEntry.gameId,
+                        }
+                        : undefined
+                }
+            />
 
-                        <ScrollArea className="flex-1 pr-4">
-                            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 pb-8">
-                                {filteredSteamGames.map((game) => (
-                                    <Card key={game.appid} className="overflow-hidden py-0 group hover:border-primary/50 transition-colors">
-                                        <div className="aspect-[16/9] relative overflow-hidden bg-muted">
-                                            <img
-                                                src={`https://cdn.cloudflare.steamstatic.com/steam/apps/${game.appid}/header.jpg`}
-                                                alt={game.name}
-                                                className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
-                                                onError={(e) => {
-                                                    (e.target as HTMLImageElement).src = "https://placehold.co/600x400?text=No+Image";
-                                                }}
-                                            />
-                                        </div>
-                                        <CardHeader humanitarian-p-padding="p-2" className="p-2 space-y-1">
-                                            <CardTitle className="text-xs line-clamp-1 h-4">
-                                                {game.name}
-                                            </CardTitle>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="w-full h-6 text-[9px] justify-between px-2 hover:bg-[#1b2838] hover:text-white"
-                                                asChild
-                                            >
-                                                <a
-                                                    href={`https://store.steampowered.com/app/${game.appid}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                >
-                                                    Steam Page <ExternalLink className="h-3 w-3" />
-                                                </a>
-                                            </Button>
-                                        </CardHeader>
-                                    </Card>
-                                ))}
+            <GameJournalListModal
+                isOpen={isListModalOpen}
+                onClose={() => {
+                    setIsListModalOpen(false);
+                    setSelectedGameForJournals(null);
+                }}
+                game={selectedGameForJournals}
+                entries={filteredEntriesForGame.map((e) => ({
+                    ...e,
+                    createdAt: new Date(e.createdAt),
+                }))}
+                onEditEntry={(entry) => {
+                    setIsListModalOpen(false);
+                    handleEditEntry(entry);
+                }}
+                onDeleteEntry={handleDeleteEntry}
+            />
 
-                                {filteredSteamGames.length === 0 && (
-                                    <div className="col-span-full py-12 text-center bg-muted/30 rounded-lg border border-dashed">
-                                        <Search className="h-8 w-8 text-muted-foreground mx-auto mb-2 opacity-50" />
-                                        <p className="text-sm text-muted-foreground">
-                                            {searchQuery ? `No games matching "${searchQuery}"` : "No Steam games found."}
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        </ScrollArea>
-                    </div>
+            <WishlistModal
+                isOpen={isWishlistModalOpen}
+                onClose={() => setIsWishlistModalOpen(false)}
+                onAdd={handleCreateWishlist}
+                onSearch={handleSearchGames}
+            />
 
-                    {/* PSN Section */}
-                    <div className="flex-1 flex flex-col min-w-0">
-                        <div className="flex items-center gap-2 border-b pb-2 mb-4 shrink-0">
-                            <Gamepad2 className="h-5 w-5 text-[#003087]" />
-                            <h3 className="font-semibold text-lg">PSN Library</h3>
-                        </div>
-                        <ScrollArea className="flex-1 pr-4">
-                            <div className="py-8 text-center bg-muted/50 rounded-lg border border-dashed">
-                                <p className="text-sm text-muted-foreground">PSN library sync coming soon.</p>
-                            </div>
-                        </ScrollArea>
-                    </div>
-                </div>
-            </TabsContent>
-        </Tabs>
+            <JournalFAB onClick={handleAddNew} />
+        </div>
     );
 }

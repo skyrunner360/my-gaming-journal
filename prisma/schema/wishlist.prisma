@@ -1,0 +1,26 @@
+model Wishlist {
+    id        String          @id @default(cuid())
+    userId    String
+    user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+    title     String
+    items     WishlistEntry[]
+    createdAt DateTime        @default(now())
+    updatedAt DateTime        @updatedAt
+
+    @@map("wishlist")
+}
+
+model WishlistEntry {
+    id         String   @id @default(cuid())
+    wishlistId String
+    wishlist   Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+    gambrainId Int
+    gameName   String
+    gameImage  String?
+    storeUrl   String?
+    createdAt  DateTime @default(now())
+    user       User?    @relation(fields: [userId], references: [id])
+    userId     String?
+
+    @@map("wishlist_entry")
+}

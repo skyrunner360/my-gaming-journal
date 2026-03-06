@@ -113,7 +113,6 @@ export function SteamSection({
 									</CardHeader>
 									<CardContent>
 										<p className="text-2xl font-bold">{stat.placeholder}</p>
-
 									</CardContent>
 								</Card>
 							))}

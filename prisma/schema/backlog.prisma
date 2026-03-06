@@ -1,0 +1,13 @@
+model BacklogEntry {
+    id        String   @id @default(cuid())
+    userId    String
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    gameId    Int // Steam AppID or similar
+    gameName  String
+    gameIcon  String?
+    position  Int // For manual ordering
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@map("backlog_entry")
+}

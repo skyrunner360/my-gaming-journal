@@ -221,14 +221,14 @@ export async function getSteamFamilyGames(familySteamIds: string[]) {
 	if (familySteamIds.length === 0) return [];
 
 	try {
-        const gamesPromises = familySteamIds.map(id => getSteamOwnedGames(id));
-        const gamesResults = await Promise.all(gamesPromises);
-        
-        // Flatten and add a flag
-        return gamesResults.flat().map(game => ({
-            ...game,
-            is_family_shared: true
-        }));
+		const gamesPromises = familySteamIds.map((id) => getSteamOwnedGames(id));
+		const gamesResults = await Promise.all(gamesPromises);
+
+		// Flatten and add a flag
+		return gamesResults.flat().map((game) => ({
+			...game,
+			is_family_shared: true,
+		}));
 	} catch (error) {
 		console.error("Failed to fetch Steam family games:", error);
 		return [];
@@ -254,9 +254,12 @@ export async function getSteamFamilyIDs() {
 	});
 
 	if (!connection) return [];
-    
-    // Store as comma-separated in 'value'
-	return connection.value.split(",").map(id => id.trim()).filter(Boolean);
+
+	// Store as comma-separated in 'value'
+	return connection.value
+		.split(",")
+		.map((id) => id.trim())
+		.filter(Boolean);
 }
 
 export async function updateSteamFamilyIDs(ids: string) {
@@ -269,10 +272,16 @@ export async function updateSteamFamilyIDs(ids: string) {
 	}
 
 	const existingIds = await getSteamFamilyIDs();
-	const newIds = ids.split(",").map(id => id.trim()).filter(Boolean);
-	
+	const newIds = ids
+		.split(",")
+		.map((id) => id.trim())
+		.filter(Boolean);
+
 	// Merge and limit to 3
-	const combinedIds = Array.from(new Set([...existingIds, ...newIds])).slice(0, 3);
+	const combinedIds = Array.from(new Set([...existingIds, ...newIds])).slice(
+		0,
+		3,
+	);
 	const value = combinedIds.join(",");
 
 	await prisma.connection.upsert({
@@ -307,7 +316,7 @@ export async function removeSteamFamilyMember(steamId: string) {
 	}
 
 	const existingIds = await getSteamFamilyIDs();
-	const filteredIds = existingIds.filter(id => id !== steamId);
+	const filteredIds = existingIds.filter((id) => id !== steamId);
 
 	if (filteredIds.length === 0) {
 		await prisma.connection.delete({
